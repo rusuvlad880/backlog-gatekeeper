@@ -42,6 +42,13 @@ def get_all_games():
     conn.close()
     return games
 
+def delete_game(game_id):
+    conn = sqlite3.connect('backlog.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM games WHERE id = ?', (game_id,))
+    conn.commit()
+    conn.close()
+
 if __name__ == '__main__':
     create_table()
     print("Database and 'games' table created succesfully!")

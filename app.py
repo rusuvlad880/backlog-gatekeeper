@@ -33,6 +33,11 @@ status_entry.pack(pady=10)
 game_list_frame = ctk.CTkScrollableFrame(app, width=350, height=200, label_text="My Backlog")
 game_list_frame.pack(pady=20)
 
+def mark_as_done(game_id):
+    database.delete_game(game_id)
+    print(f"Game {game_id} removed from backlog!")
+    load_games()
+
 def load_games():
     for widget in game_list_frame.winfo_children():
         widget.destroy()
@@ -40,9 +45,18 @@ def load_games():
     games = database.get_all_games()
 
     for game in games:
+        game_id = game[0]
         game_text = f"{game[1]} - {game[2]} [{game[3]}]"
-        label =ctk.CTkLabel(game_list_frame, text=game_text)
-        label.pack(anchor="w", padx=10, pady=2)
+
+        row_frame = ctk.CTkFrame(game_list_frame, fg_color='transparent')
+        row_frame.pack(fill="x", pady=2)
+
+        label =ctk.CTkLabel(row_frame, text=game_text)
+        label.pack(anchor="w", padx=10)
+
+        done_button =ctk.CTkButton(row_frame, text="Done", width=50, fg_color="#C62828", hover_color="#B71C1C",
+                                   command=lambda id=game_id: mark_as_done(id))
+        done_button.pack(side="right", padx=10)
 
 def save_button_clicked():
 
