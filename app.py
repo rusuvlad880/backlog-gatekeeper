@@ -33,6 +33,17 @@ status_entry.pack(pady=10)
 game_list_frame = ctk.CTkScrollableFrame(app, width=350, height=200, label_text="My Backlog")
 game_list_frame.pack(pady=20)
 
+def change_theme_event(new_appearance_mode: str):
+    ctk.set_appearance_mode(new_appearance_mode)
+
+theme_option_menu=ctk.CTkOptionMenu(
+    app,
+    values=["System", "Dark", "Light"],
+    command=change_theme_event
+)
+theme_option_menu.pack(pady=10)
+theme_option_menu.set("System")
+
 def mark_as_done(game_id):
     database.delete_game(game_id)
     print(f"Game {game_id} removed from backlog!")
