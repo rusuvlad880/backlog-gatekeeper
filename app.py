@@ -13,13 +13,13 @@ ctk.set_default_color_theme("blue")
 #Create the main window
 
 app = ctk.CTk()
-app.geometry ("500x350")
+app.geometry ("500x650")
 app.title("Backlog Gatekeeper")
 
 #Welcome Label
 
 welcome_label = ctk.CTkLabel(app, text="Welcome to the Backlog Gatekeeper!", font=("Arial", 20, "bold"))
-welcome_label.pack(pady=40)
+welcome_label.pack(pady=20)
 
 title_entry = ctk.CTkEntry(app, placeholder_text="Game Title", width=250)
 title_entry.pack(pady=10)
@@ -29,6 +29,20 @@ platform_entry.pack(pady=10)
 
 status_entry = ctk.CTkEntry(app, placeholder_text="Status of your game", width=250)
 status_entry.pack(pady=10)
+
+game_list_frame = ctk.CTkScrollableFrame(app, width=350, height=200, label_text="My Backlog")
+game_list_frame.pack(pady=20)
+
+def load_games():
+    for widget in game_list_frame.winfo_children():
+        widget.destroy()
+
+    games = database.get_all_games()
+
+    for game in games:
+        game_text = f"{game[1]} - {game[2]} [{game[3]}]"
+        label =ctk.CTkLabel(game_list_frame, text=game_text)
+        label.pack(anchor="w", padx=10, pady=2)
 
 def save_button_clicked():
 
@@ -44,11 +58,14 @@ def save_button_clicked():
         platform_entry.delete(0, ctk.END)
         status_entry.delete(0, ctk.END)
 
+        load_games()
     else:
         print("Please fill in all the fields!")
 
 add_button = ctk.CTkButton(app, text="Save Game", command=save_button_clicked)
 add_button.pack(pady=20)
+
+load_games()
 
 #Run
 

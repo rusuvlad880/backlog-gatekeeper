@@ -34,6 +34,14 @@ def add_game(title, platform, status):
     conn.commit()
     conn.close()
 
+def get_all_games():
+    conn = sqlite3.connect('backlog.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM games')
+    games = cursor.fetchall()
+    conn.close()
+    return games
+
 if __name__ == '__main__':
     create_table()
     print("Database and 'games' table created succesfully!")
