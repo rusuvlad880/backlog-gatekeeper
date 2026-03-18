@@ -1,54 +1,37 @@
-import sqlite3
+import os
+from dotenv import load_dotenv
+from supabase import create_client, Client
+
+load_dotenv()
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY")
+
+supabase: Client = create_client(url, key)
 
 def create_table():
-
-    #Creates file called backlog.db if it doesn't exist and connects to it
-
-    conn = sqlite3.connect('backlog.db')
-    cursor = conn.cursor()
-
-    #SQL command creates games table with 4 columns
-
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS games(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            platform TEXT NOT NULL,
-            status TEXT NOT NULL       
-        )
-    ''')
-
-    #Save changes and close the connection
-    conn.commit()
-    conn.close()
+    pass
 
 def add_game(title, platform, status):
 
-    conn = sqlite3.connect('backlog.db')
-    cursor = conn.cursor()
-
-    cursor.execute('''
-        INSERT INTO games (title, platform, status)
-        VALUES (?, ?, ?)
-    ''', (title, platform, status))
-    conn.commit()
-    conn.close()
+    supabase.table("games").insert({
+        "title": title, 
+        "platform": platform, 
+        "status": status
+    }).execute()
 
 def get_all_games():
-    conn = sqlite3.connect('backlog.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM games')
-    games = cursor.fetchall()
-    conn.close()
-    return games
+
+    response = supabase.table("games").select("*").execute()
+
+    games_list = []
+    for row in response.data:
+        games_list.append((row['id'], row['title'], row['platform'], row['status']))
+
+    return games_list
 
 def delete_game(game_id):
-    conn = sqlite3.connect('backlog.db')
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM games WHERE id = ?', (game_id,))
-    conn.commit()
-    conn.close()
+
+    supabase.table("games").delete().eq("id", game_id).execute()
 
 if __name__ == '__main__':
-    create_table()
-    print("Database and 'games' table created succesfully!")
+    print("Cloud database script ready!")
