@@ -8,20 +8,41 @@ key = os.environ.get("SUPABASE_KEY")
 
 supabase: Client = create_client(url, key)
 
+def register_user(email, password):
+    
+    response = supabase.auth.sign_up({"email": email, "password": password})
+    return response
+
+def login_user(email, password):
+    
+    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+    return password
+
+def get_current_user_id():
+
+    user = supabase.auth.get_user()
+    if user:
+        return user.user.id
+    return None
+
 def create_table():
     pass
 
 def add_game(title, platform, status):
 
+    user_id = get_current_user_id()
+
     supabase.table("games").insert({
         "title": title, 
         "platform": platform, 
-        "status": status
+        "status": status,
+        "user_id": user_id
     }).execute()
 
 def get_all_games():
+    user_id = get_current_user_id()
 
-    response = supabase.table("games").select("*").execute()
+    response = supabase.table("games").select("*").eq("user_id", user_id).execute()
 
     games_list = []
     for row in response.data:
