@@ -21,6 +21,8 @@ dashboard_screen = ctk.CTkFrame(app, fg_color="transparent")
 
 current_image_url = ""
 
+image_cache = {}
+
 # SCREEN 1: LOGIN
 
 login_box = ctk.CTkFrame(login_screen, width=400, height=500)
@@ -126,7 +128,7 @@ status_dropdown.pack(pady=10)
 status_dropdown.set("Backlog")
 
 def save_button_clicked():
-    global current_image_url # <--- 1. We tell the save button to grab the ghost variable!
+    global current_image_url
     
     title = title_entry.get()
     platform = platform_entry.get()
@@ -134,7 +136,6 @@ def save_button_clicked():
     
     if title and platform and status:
         try:
-            # 2. We pass ALL 4 pieces of info to the database!
             database.add_game(title, platform, status, current_image_url)
             
             print(f"Success! Saved {title} to the cloud with its image.")
@@ -143,8 +144,7 @@ def save_button_clicked():
             platform_entry.delete(0, ctk.END)
             status_dropdown.set("Backlog")
             
-            current_image_url = "" # 3. Wipe the variable clean for the next game!
-            load_games()
+            current_image_url = "" 
         except Exception as e:
             print(f"DATABASE ERROR: {e}") 
     else:
@@ -168,6 +168,26 @@ main_area.pack(side="right", fill="both", expand=True, padx=20, pady=20)
 
 dashboard_title = ctk.CTkLabel(main_area, text="My Digital Shelf", font=("Arial", 32, "bold"))
 dashboard_title.pack(anchor="w", pady=(0, 20))
+
+stats_frame = ctk.CTkFrame(main_area, fg_color="transparent")
+stats_frame.pack(fill="x", pady=(0, 20), anchor="w")
+
+stats_label = ctk.CTkLabel(stats_frame, text="Total: 0 | Playing: 0 | Finished: 0", font=("Arial", 16))
+stats_label.pack(side="left")
+
+progress_bar = ctk.CTkProgressBar(stats_frame, width=200, fg_color="#333333", progress_color="#2E7D32")
+progress_bar.pack(side="left")
+progress_bar.set(0) # Starts at 0%
+
+progress_label = ctk.CTkLabel(stats_frame, text="0% Completed", font=("Arial", 14, "bold"), text_color="#2E7D32")
+progress_label.pack(side="left", padx=15)
+
+search_var = ctk.StringVar() 
+
+search_entry = ctk.CTkEntry(main_area, placeholder_text="🔍 Search your library (Title or Platform)...", textvariable=search_var, width=350, height=35)
+search_entry.pack(pady=(0, 15), anchor="w")
+
+search_entry.pack(pady=(0, 15), anchor="w")
 
 tabview = ctk.CTkTabview(main_area)
 tabview.pack(fill="both", expand=True)
@@ -193,51 +213,98 @@ def remove_game(game_id):
     database.delete_game(game_id)
     load_games()
 
-def load_games():
-
+def load_games(*args): 
     for frame in scroll_frames.values():
         for widget in frame.winfo_children():
             widget.destroy()
+            
+    all_games = database.get_all_games()
+    
+    total_games = len(all_games)
+    playing_count = sum(1 for game in all_games if game[3] == "Playing")
+    finished_count = sum(1 for game in all_games if game[3] == "Finished")
+    
+    stats_label.configure(text=f"Total: {total_games}  |  Playing: {playing_count}  |  Finished: {finished_count}")
+    
+    if total_games > 0:
+        completion_percentage = finished_count / total_games
+    else:
+        completion_percentage = 0
+        
+    progress_bar.set(completion_percentage)
+    progress_label.configure(text=f"{int(completion_percentage * 100)}% Completed")
+    
+    current_search = search_var.get().lower()
+    games_to_display = []
+    
+    for game in all_games:
+        title = game[1].lower()
+        platform = game[2].lower()
+        if current_search == "" or current_search in title or current_search in platform:
+            games_to_display.append(game)
+    
 
-    games = database.get_all_games()
+    tab_cols = {"Backlog": 0, "Playing": 0, "Finished": 0}
+    tab_rows = {"Backlog": 0, "Playing": 0, "Finished": 0}
+    MAX_COLS = 3 
 
-    for game in games:
-        # Unpack the data
+    for game in games_to_display:
         game_id, title, platform, status, img_link = game[0], game[1], game[2], game[3], game[4]
         
         if status not in scroll_frames:
             status = "Backlog"
             
-        # STEP 1: BUILD THE BOX FIRST! (Python needs this to exist before putting things inside)
-        row_frame = ctk.CTkFrame(scroll_frames[status])
-        row_frame.pack(fill="x", pady=5)
+        card_frame = ctk.CTkFrame(scroll_frames[status], width=220, height=200, corner_radius=10)
+        card_frame.grid_propagate(False) 
         
-        # STEP 2: LOAD AND ATTACH THE IMAGE
+        card_frame.grid(row=tab_rows[status], column=tab_cols[status], padx=15, pady=15)
+        
         if img_link: 
             try:
-                img_data = requests.get(img_link).content 
-                img = Image.open(io.BytesIO(img_data)) 
-                ctk_img = ctk.CTkImage(img, size=(120, 45)) 
+                if img_link not in image_cache:
+                    img_data = requests.get(img_link).content 
+                    img = Image.open(io.BytesIO(img_data)) 
+                    ctk_img = ctk.CTkImage(img, size=(190, 85)) 
+                    image_cache[img_link] = ctk_img 
                 
-                img_label = ctk.CTkLabel(row_frame, image=ctk_img, text="")
-                img_label.image = ctk_img # The Magic Anchor!
-                img_label.pack(side="left", padx=(10, 0), pady=10)
+                cached_img = image_cache[img_link]
+                img_label = ctk.CTkLabel(card_frame, image=cached_img, text="")
+                img_label.image = cached_img
+                img_label.pack(pady=(10, 5))
             except Exception as e:
                 print(f"Failed to load image for {title}: {e}")
         
-        # STEP 3: ATTACH THE TEXT
-        label = ctk.CTkLabel(row_frame, text=f"{title}  |  {platform}", font=("Arial", 16))
-        label.pack(side="left", padx=20, pady=10)
+        title_label = ctk.CTkLabel(card_frame, text=title, font=("Arial", 14, "bold"), wraplength=200)
+        title_label.pack(pady=(0, 0))
         
-        # STEP 4: ATTACH THE SMART BUTTONS
+        plat_label = ctk.CTkLabel(card_frame, text=platform, font=("Arial", 12), text_color="gray")
+        plat_label.pack(pady=(0, 10))
+        
         if status == "Backlog":
-            btn = ctk.CTkButton(row_frame, text="Start Playing", width=100, fg_color="#2E7D32", hover_color="#1B5E20", command=lambda id=game_id: change_status(id, "Playing"))
+            btn = ctk.CTkButton(card_frame, text="Start Playing", fg_color="#2E7D32", hover_color="#1B5E20", command=lambda id=game_id: change_status(id, "Playing"))
         elif status == "Playing":
-            btn = ctk.CTkButton(row_frame, text="Finish Game", width=100, fg_color="#1565C0", hover_color="#0D47A1", command=lambda id=game_id: change_status(id, "Finished"))
+            btn = ctk.CTkButton(card_frame, text="Finish Game", fg_color="#1565C0", hover_color="#0D47A1", command=lambda id=game_id: change_status(id, "Finished"))
         elif status == "Finished":
-            btn = ctk.CTkButton(row_frame, text="Delete", width=80, fg_color="#C62828", hover_color="#B71C1C", command=lambda id=game_id: remove_game(id))
+            btn = ctk.CTkButton(card_frame, text="Delete", fg_color="#C62828", hover_color="#B71C1C", command=lambda id=game_id: remove_game(id))
             
-        btn.pack(side="right", padx=20)
+        btn.pack(side="bottom", pady=(0, 15))
+
+
+        tab_cols[status] += 1
+        if tab_cols[status] >= MAX_COLS: 
+            tab_cols[status] = 0        
+            tab_rows[status] += 1        
+search_timer = None
+
+def on_search_update(*args):
+    global search_timer
+
+    if search_timer is not None:
+        app.after_cancel(search_timer)
+
+    search_timer = app.after(300, load_games)
+
+search_var.trace_add("write", load_games)
 
 # START APP
 
