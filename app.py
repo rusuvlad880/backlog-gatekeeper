@@ -9,11 +9,32 @@ from PIL import Image
 
 ctk.set_appearance_mode("dark")
 
+BG_COLOR = "#0B1117" #bottom layer
+SIDEBAR_COLOR = "#111827"
+SURFACE_COLOR = "#1F2937" # floating layer
+CARD_COLOR = "#1F2937" # game cards color
+INPUT_COLOR = "#374151" # text boxes and dropdowns
+
+ACCENT_COLOR = "#8B5CF6" #primary buttons
+ACCENT_HOVER = "#7C3AED" # button hover state
+
+PLAY_COLOR = "#10B981"
+PLAY_HOVER = "#059669"
+DELETE_COLOR = "#F43F5E"
+DELETE_HOVER = "#E11D48"
+
+TEXT_MAIN = "#F8FAFC"
+TEXT_SUB = "#94A3B8"
+FONT_MAIN = ("Segoe UI", 14)
+FONT_HEADING = ("Seague UI", 28, "bold")
+
 #Create the main window
 
 app = ctk.CTk()
-app.geometry ("1000x650")
+app.geometry ("1100x700")
 app.title("Backlog Gatekeeper")
+
+app.configure(fg_color=BG_COLOR)
 
 login_screen = ctk.CTkFrame(app, fg_color="transparent")
 dashboard_screen = ctk.CTkFrame(app, fg_color="transparent")
@@ -69,13 +90,150 @@ register_btn.pack(pady=(0, 40))
 
 # SCREEN 2 DASHBOARD
 
-sidebar = ctk.CTkFrame(dashboard_screen, width=250, corner_radius=0)
+# GLOBAL NAVIGATION SIDEBAR
+
+global_sidebar = ctk.CTkFrame(dashboard_screen, width=180, corner_radius=0, fg_color="#070A10") 
+global_sidebar.pack(side="left", fill="y")
+
+app_logo = ctk.CTkLabel(global_sidebar, text="GATEKEEPER", font=FONT_HEADING, text_color=ACCENT_COLOR)
+app_logo.pack(pady=(30, 40))
+
+# CONTENT CONTAINER
+content_container = ctk.CTkFrame(dashboard_screen, fg_color="transparent")
+content_container.pack(side="right", fill="both", expand=True)
+
+# 3 PAGES
+library_page = ctk.CTkFrame(content_container, fg_color="transparent")
+social_page = ctk.CTkFrame(content_container, fg_color="transparent")
+settings_page = ctk.CTkFrame(content_container, fg_color="transparent")
+
+def load_social_page():
+    # 1. Clear the page so we have a blank canvas
+    for widget in social_page.winfo_children():
+        widget.destroy()
+        
+    # 2. Ask the database if this user has a profile
+    profile = database.get_profile()
+    
+    if profile is None:
+        # --- THE CLAIM USERNAME SCREEN ---
+        setup_frame = ctk.CTkFrame(social_page, fg_color="transparent")
+        setup_frame.pack(expand=True)
+        
+        ctk.CTkLabel(setup_frame, text="Welcome to the Network.", font=("Segoe UI", 32, "bold")).pack(pady=(0, 10))
+        ctk.CTkLabel(setup_frame, text="Claim your unique username to start adding friends.", font=FONT_MAIN, text_color=TEXT_SUB).pack(pady=(0, 30))
+        
+        username_var = ctk.StringVar()
+        user_entry = ctk.CTkEntry(setup_frame, placeholder_text="Enter a username...", textvariable=username_var, width=300, height=45, fg_color=INPUT_COLOR, border_width=0, font=FONT_MAIN)
+        user_entry.pack(pady=(0, 20))
+        
+        def attempt_claim():
+            desired_name = username_var.get().strip()
+            if desired_name:
+                success = database.create_profile(desired_name)
+                if success:
+                    print(f"Successfully claimed {desired_name}!")
+                    load_social_page() # Reload the page to show the actual hub!
+                else:
+                    print("That username is taken or an error occurred.")
+                    
+        ctk.CTkButton(setup_frame, text="Claim Username", width=300, height=45, fg_color=ACCENT_COLOR, hover_color=ACCENT_HOVER, font=("Segoe UI", 16, "bold"), command=attempt_claim).pack()
+
+    else:
+        my_username = profile['username']
+        
+        header_frame = ctk.CTkFrame(social_page, fg_color="transparent")
+        header_frame.pack(fill="x", padx=40, pady=40)
+        
+        ctk.CTkLabel(header_frame, text=f"Welcome back, {my_username}!", font=("Segoe UI", 32, "bold")).pack(side="left")
+        
+        search_frame = ctk.CTkFrame(social_page, fg_color="transparent")
+        search_frame.pack(fill="x", padx=40, pady=(0, 20))
+        
+        friend_search_var = ctk.StringVar()
+        friend_search_entry = ctk.CTkEntry(search_frame, placeholder_text="🔍 Search for friends by username...", textvariable=friend_search_var, width=350, height=35, fg_color=INPUT_COLOR, border_width=0)
+        friend_search_entry.pack(side="left", padx=(0, 10))
+        
+        # This is the box where the search results will appear!
+        results_frame = ctk.CTkScrollableFrame(social_page, fg_color="transparent", height=250)
+        results_frame.pack(fill="x", padx=40, pady=10)
+
+        def perform_friend_search():
+            # 1. Clear old results
+            for widget in results_frame.winfo_children():
+                widget.destroy()
+                
+            query = friend_search_var.get().strip()
+            if not query:
+                return
+                
+            # 2. Ask the database!
+            results = database.search_users(query)
+            
+            if not results:
+                ctk.CTkLabel(results_frame, text="No users found.", font=FONT_MAIN, text_color=TEXT_SUB).pack(pady=20)
+                return
+                
+            # 3. Draw the User Cards
+            for user in results:
+                user_row = ctk.CTkFrame(results_frame, fg_color=CARD_COLOR, corner_radius=8)
+                user_row.pack(fill="x", pady=5)
+                
+                ctk.CTkLabel(user_row, text=user['username'], font=("Segoe UI", 16, "bold"), text_color=TEXT_MAIN).pack(side="left", padx=20, pady=15)
+                
+                add_btn = ctk.CTkButton(user_row, text="Add Friend", width=100, fg_color=ACCENT_COLOR, hover_color=ACCENT_HOVER, 
+                                        command=lambda fid=user['user_id']: send_request(fid))
+                add_btn.pack(side="right", padx=20)
+
+        def send_request(friend_id):
+            success = database.send_friend_request(friend_id)
+            if success:
+                print("Friend request sent successfully!")
+            else:
+                print("Failed! You might already be friends or have a pending request.")
+
+        search_btn = ctk.CTkButton(search_frame, text="Search", width=100, height=35, fg_color=ACCENT_COLOR, hover_color=ACCENT_HOVER, command=perform_friend_search)
+        search_btn.pack(side="left")
+
+
+#PLACEHOLDER FOR SETTINGS
+ctk.CTkLabel(settings_page, text="⚙️ Settings & Sync", font=FONT_HEADING).pack(pady=50)
+ctk.CTkLabel(settings_page, text="Steam OAuth Login and App Preferences will go here.", font=FONT_MAIN, text_color=TEXT_SUB).pack()
+
+def switch_page(page_name):
+    library_page.pack_forget()
+    social_page.pack_forget()
+    settings_page.pack_forget()
+
+    if page_name == "Library":
+        library_page.pack(fill="both", expand=True)
+    elif page_name == "Social":
+        social_page.pack(fill="both", expand=True)
+    elif page_name == "Settings":
+        settings_page.pack(fill="both", expand=True)
+
+# NAV BUTTONS
+
+nav_btn_lib = ctk.CTkButton(global_sidebar, text="📚 My Library", font=FONT_MAIN, fg_color="transparent", text_color=TEXT_MAIN, hover_color=SIDEBAR_COLOR, anchor="w", command=lambda: switch_page("Library"))
+nav_btn_lib.pack(pady=10, padx=10, fill="x")
+
+nav_btn_soc = ctk.CTkButton(global_sidebar, text="🌐 Social Hub", font=FONT_MAIN, fg_color="transparent", text_color=TEXT_MAIN, hover_color=SIDEBAR_COLOR, anchor="w", 
+                            command=lambda: [load_social_page(), switch_page("Social")])
+nav_btn_soc.pack(pady=10, padx=10, fill="x")
+
+nav_btn_set = ctk.CTkButton(global_sidebar, text="⚙️ Settings", font=FONT_MAIN, fg_color="transparent", text_color=TEXT_MAIN, hover_color=SIDEBAR_COLOR, anchor="w", command=lambda: switch_page("Settings"))
+nav_btn_set.pack(pady=10, padx=10, fill="x")
+
+# Library default
+library_page.pack(fill="both", expand=True)
+
+sidebar = ctk.CTkFrame(library_page, width=250, corner_radius=0, fg_color=SIDEBAR_COLOR)
 sidebar.pack(side="left", fill="y")
 
 sidebar_title = ctk.CTkLabel(sidebar, text="Add New Game", font=("Arial", 20, "bold"))
 sidebar_title.pack(pady=(30, 10))
 
-steam_search_entry = ctk.CTkEntry(sidebar, placeholder_text="Search Steam...", width=200)
+steam_search_entry = ctk.CTkEntry(sidebar, placeholder_text="Search Steam...", width=200, fg_color=INPUT_COLOR, border_width=0)
 steam_search_entry.pack(pady=5)
 
 def perform_steam_search():
@@ -113,16 +271,17 @@ def perform_steam_search():
     except Exception as e:
         print(f"Steam API Error: {e}")
 
-steam_btn = ctk.CTkButton(sidebar, text="Auto-Fill from Steam", command=perform_steam_search, width=200, fg_color="#171A21", hover_color="#2A475E")
+steam_btn = ctk.CTkButton(sidebar, text="Auto-Fill from Steam", command=perform_steam_search, width=200, fg_color=INPUT_COLOR, border_color=ACCENT_COLOR)
 steam_btn.pack(pady=(0, 20))
 
-title_entry = ctk.CTkEntry(sidebar, placeholder_text="Game Title", width=200)
+title_entry = ctk.CTkEntry(sidebar, placeholder_text="Game Title", width=200, fg_color=INPUT_COLOR, border_width=0)
 title_entry.pack(pady=10)
 
-platform_entry = ctk.CTkEntry(sidebar, placeholder_text="Platform (e.g., PC)", width=200)
+platform_entry = ctk.CTkEntry(sidebar, placeholder_text="Platform (e.g., PC)", width=200, fg_color=INPUT_COLOR, border_width=0)
 platform_entry.pack(pady=10)
 
-status_dropdown = ctk.CTkOptionMenu(sidebar, values=["Backlog", "Playing", "Finished"], width=200)
+status_dropdown = ctk.CTkOptionMenu(sidebar, values=["Backlog", "Playing", "Finished"], width=200, 
+                                    fg_color=INPUT_COLOR, button_color=ACCENT_COLOR, button_hover_color=ACCENT_HOVER, dropdown_fg_color=SIDEBAR_COLOR)
 status_dropdown.pack(pady=10)
 status_dropdown.set("Backlog")
 
@@ -149,20 +308,22 @@ def save_button_clicked():
     else:
         print("Please fill out all boxes.")
 
-save_btn = ctk.CTkButton(sidebar, text="Save to Backlog", command=save_button_clicked, width=200)
+save_btn = ctk.CTkButton(sidebar, text="Save to Backlog", command=save_button_clicked, width=200, 
+                         fg_color=ACCENT_COLOR, hover_color=ACCENT_HOVER, font=FONT_MAIN, corner_radius=8)
 save_btn.pack(pady=20)
 
 def change_theme_event(new_appearance_mode: str):
     ctk.set_appearance_mode(new_appearance_mode)
 
-theme_option_menu = ctk.CTkOptionMenu(sidebar, values=["System", "Dark", "Light"], command=change_theme_event)
+theme_option_menu = ctk.CTkOptionMenu(sidebar, values=["System", "Dark", "Light"], command=change_theme_event,
+                                      fg_color=INPUT_COLOR, button_color=ACCENT_COLOR, button_hover_color=ACCENT_HOVER, dropdown_fg_color=SIDEBAR_COLOR)
 theme_option_menu.pack(side="bottom", pady=(0, 20))
 
 theme_label = ctk.CTkLabel(sidebar, text="Theme Preferences:")
 theme_label.pack(side="bottom", pady=(0, 5))
 theme_option_menu.set("System")
 
-main_area = ctk.CTkFrame(dashboard_screen, fg_color="transparent")
+main_area = ctk.CTkFrame(library_page, fg_color="transparent")
 main_area.pack(side="right", fill="both", expand=True, padx=20, pady=20)
 
 dashboard_title = ctk.CTkLabel(main_area, text="My Digital Shelf", font=("Arial", 32, "bold"))
@@ -186,16 +347,16 @@ search_sort_frame.pack(fill="x", pady=(10, 10))
 
 search_var = ctk.StringVar() 
 
-search_entry = ctk.CTkEntry(search_sort_frame, placeholder_text=" Search your library (Title or Platform)...", textvariable=search_var, width=350, height=35)
+search_entry = ctk.CTkEntry(search_sort_frame, placeholder_text="🔍 Search your library...", textvariable=search_var, width=350, height=35,
+                            fg_color=INPUT_COLOR, border_width=0) 
 search_entry.pack(side="left")
 
 sort_var = ctk.StringVar(value="Newest First") # Default sorting
-sort_dropdown = ctk.CTkOptionMenu(search_sort_frame, values=["Newest First", "Alphabetical(A-Z)", "Platform"], variable=sort_var, command=lambda _: load_games())
+sort_dropdown = ctk.CTkOptionMenu(search_sort_frame, values=["Newest First", "Alphabetical (A-Z)", "Platform"], variable=sort_var, command=lambda _: load_games(),
+                                  fg_color=SURFACE_COLOR, button_color=ACCENT_COLOR, button_hover_color=ACCENT_HOVER, dropdown_fg_color=SIDEBAR_COLOR)
 sort_dropdown.pack(side="right")
 
-search_entry.pack(pady=(0, 15), anchor="w")
-
-tabview = ctk.CTkTabview(main_area)
+tabview = ctk.CTkTabview(main_area, fg_color=SIDEBAR_COLOR, segmented_button_selected_color=ACCENT_COLOR, segmented_button_selected_hover_color=ACCENT_HOVER)
 tabview.pack(fill="both", expand=True)
 
 tab_backlog = tabview.add("Backlog")
@@ -271,9 +432,8 @@ def load_games(*args):
         if status not in scroll_frames:
             status = "Backlog"
             
-        card_frame = ctk.CTkFrame(scroll_frames[status], width=220, height=200, corner_radius=10)
+        card_frame = ctk.CTkFrame(scroll_frames[status], width=220, height=200, corner_radius=15, fg_color=CARD_COLOR)
         card_frame.grid_propagate(False) 
-        
         card_frame.grid(row=tab_rows[status], column=tab_cols[status], padx=15, pady=15)
         
         if img_link: 
@@ -298,9 +458,9 @@ def load_games(*args):
         plat_label.pack(pady=(0, 10))
         
         if status == "Backlog":
-            btn = ctk.CTkButton(card_frame, text="Start Playing", fg_color="#2E7D32", hover_color="#1B5E20", command=lambda id=game_id: change_status(id, "Playing"))
+            btn = ctk.CTkButton(card_frame, text="Start Playing", fg_color=ACCENT_COLOR, hover_color=ACCENT_HOVER, command=lambda id=game_id: change_status(id, "Playing"))
         elif status == "Playing":
-            btn = ctk.CTkButton(card_frame, text="Finish Game", fg_color="#1565C0", hover_color="#0D47A1", command=lambda id=game_id: change_status(id, "Finished"))
+            btn = ctk.CTkButton(card_frame, text="Finish Game", fg_color=ACCENT_COLOR, hover_color=ACCENT_HOVER, command=lambda id=game_id: change_status(id, "Finished"))
         elif status == "Finished":
             btn = ctk.CTkButton(card_frame, text="Delete", fg_color="#C62828", hover_color="#B71C1C", command=lambda id=game_id: remove_game(id))
             

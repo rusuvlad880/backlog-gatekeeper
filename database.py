@@ -60,5 +60,60 @@ def update_game_status(game_id, new_status):
 
     supabase.table("games").update({"status": new_status}).eq("id", game_id).execute()
 
+def get_profile():
+    try:
+        # Ask Supabase directly who is logged in!
+        user = supabase.auth.get_user().user
+        if not user:
+            return None
+            
+        # Check if a profile exists for this specific user ID
+        response = supabase.table("profiles").select("*").eq("user_id", user.id).execute()
+        if response.data:
+            return response.data[0] # Return the profile data
+        return None
+    except Exception as e:
+        print(f"Database Error (Get Profile): {e}")
+        return None
+
+def create_profile(username):
+    try:
+        # Ask Supabase directly who is logged in!
+        user = supabase.auth.get_user().user
+        if not user:
+            return False
+            
+        # Save the new username to the vault linked to their ID!
+        data = {"user_id": user.id, "username": username}
+        supabase.table("profiles").insert(data).execute()
+        return True
+    except Exception as e:
+        print(f"Database Error (Create Profile): {e}")
+        return False
+    
+def search_users(search_query):
+    try:
+        # We use .ilike() so it finds the username even if you don't capitalize it perfectly!
+        response = supabase.table("profiles").select("*").ilike("username", f"%{search_query}%").execute()
+        
+        # We need to filter out YOUR profile, so you don't accidentally send a friend request to yourself!
+        user = supabase.auth.get_user().user
+        results = [p for p in response.data if p['user_id'] != user.id]
+        return results
+    except Exception as e:
+        print(f"Database Error (Search Users): {e}")
+        return []
+
+def send_friend_request(friend_id):
+    try:
+        user = supabase.auth.get_user().user
+        # Write the request into the ledger!
+        data = {"user_id": user.id, "friend_id": friend_id, "status": "pending"}
+        supabase.table("friends").insert(data).execute()
+        return True
+    except Exception as e:
+        print(f"Database Error (Send Request): {e}")
+        return False
+
 if __name__ == '__main__':
     print("Cloud database script ready!")
