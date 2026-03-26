@@ -7,8 +7,7 @@ from PIL import Image
 
 #Set the overall theme and color of the app
 
-ctk.set_appearance_mode("System")
-ctk.set_default_color_theme("blue")
+ctk.set_appearance_mode("dark")
 
 #Create the main window
 
@@ -182,10 +181,17 @@ progress_bar.set(0) # Starts at 0%
 progress_label = ctk.CTkLabel(stats_frame, text="0% Completed", font=("Arial", 14, "bold"), text_color="#2E7D32")
 progress_label.pack(side="left", padx=15)
 
+search_sort_frame = ctk.CTkFrame(main_area, fg_color="transparent")
+search_sort_frame.pack(fill="x", pady=(10, 10))
+
 search_var = ctk.StringVar() 
 
-search_entry = ctk.CTkEntry(main_area, placeholder_text="🔍 Search your library (Title or Platform)...", textvariable=search_var, width=350, height=35)
-search_entry.pack(pady=(0, 15), anchor="w")
+search_entry = ctk.CTkEntry(search_sort_frame, placeholder_text=" Search your library (Title or Platform)...", textvariable=search_var, width=350, height=35)
+search_entry.pack(side="left")
+
+sort_var = ctk.StringVar(value="Newest First") # Default sorting
+sort_dropdown = ctk.CTkOptionMenu(search_sort_frame, values=["Newest First", "Alphabetical(A-Z)", "Platform"], variable=sort_var, command=lambda _: load_games())
+sort_dropdown.pack(side="right")
 
 search_entry.pack(pady=(0, 15), anchor="w")
 
@@ -242,6 +248,17 @@ def load_games(*args):
         platform = game[2].lower()
         if current_search == "" or current_search in title or current_search in platform:
             games_to_display.append(game)
+
+    current_sort = sort_var.get()
+
+    if current_sort == "Alphabetical (A-Z)":
+        # We force Python to look specifically at the Title (index 1) and make it lowercase for fair sorting
+        games_to_display = sorted(games_to_display, key=lambda x: x[1].lower())
+    elif current_sort == "Platform":
+        # Sorts by Platform first, then alphabetical Title
+        games_to_display = sorted(games_to_display, key=lambda x: (x[2].lower(), x[1].lower()))
+    else: # "Newest First"
+        games_to_display.reverse()
     
 
     tab_cols = {"Backlog": 0, "Playing": 0, "Finished": 0}
