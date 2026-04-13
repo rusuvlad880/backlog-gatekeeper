@@ -181,6 +181,42 @@ def load_social_page():
         
         ctk.CTkLabel(friends_frame, text="👥 My Friends", font=("Segoe UI", 20, "bold"), text_color=TEXT_MAIN).pack(anchor="w", pady=(0, 10))
         
+        # 1. WE DEFINE THE POP-UP FUNCTION OUTSIDE THE LOOP!
+        def open_friend_shelf(friend_id, friend_name):
+            shelf_window = ctk.CTkToplevel(app)
+            shelf_window.title(f"{friend_name}'s Digital Shelf")
+            shelf_window.geometry("800x500")
+            shelf_window.configure(fg_color=BG_COLOR)
+            shelf_window.attributes("-topmost", True)
+            
+            ctk.CTkLabel(shelf_window, text=f"📚 {friend_name}'s Backlog", font=("Segoe UI", 24, "bold"), text_color=ACCENT_COLOR).pack(pady=20)
+            
+            their_games = database.get_friend_games(friend_id)
+            
+            if not their_games:
+                ctk.CTkLabel(shelf_window, text=f"{friend_name} doesn't have any games yet!", font=FONT_MAIN, text_color=TEXT_SUB).pack(pady=50)
+                return
+                
+            grid_frame = ctk.CTkScrollableFrame(shelf_window, fg_color="transparent")
+            grid_frame.pack(fill="both", expand=True, padx=20, pady=10)
+            
+            row_idx, col_idx = 0, 0
+            for game in their_games:
+                g_card = ctk.CTkFrame(grid_frame, fg_color=CARD_COLOR, width=200, height=100, corner_radius=10)
+                g_card.grid_propagate(False)
+                g_card.grid(row=row_idx, column=col_idx, padx=10, pady=10)
+                
+                ctk.CTkLabel(g_card, text=game['title'], font=("Segoe UI", 14, "bold"), text_color=TEXT_MAIN, wraplength=180).pack(pady=(15, 5))
+                
+                status_color = PLAY_COLOR if game['status'] == "Playing" else TEXT_SUB
+                ctk.CTkLabel(g_card, text=game['status'], font=("Segoe UI", 12), text_color=status_color).pack()
+                
+                col_idx += 1
+                if col_idx > 2: 
+                    col_idx = 0
+                    row_idx += 1
+
+        # 2. NOW WE RUN THE LOOP
         if my_friends:
             for f in my_friends:
                 f_card = ctk.CTkFrame(friends_frame, fg_color=CARD_COLOR, corner_radius=8, height=60)
@@ -188,8 +224,9 @@ def load_social_page():
                 
                 ctk.CTkLabel(f_card, text=f['username'], font=FONT_MAIN, text_color=TEXT_MAIN).pack(side="left", padx=20, pady=15)
                 
-                # A placeholder button for our next epic feature!
-                view_btn = ctk.CTkButton(f_card, text="View Shelf", width=100, fg_color=INPUT_COLOR, hover_color=SIDEBAR_COLOR)
+                # 3. WE USE LAMBDA TO SAFELY PASS THE SPECIFIC FRIEND'S DATA!
+                view_btn = ctk.CTkButton(f_card, text="View Shelf", width=100, fg_color=INPUT_COLOR, hover_color=SIDEBAR_COLOR, 
+                                         command=lambda fid=f['friend_id'], fname=f['username']: open_friend_shelf(fid, fname))
                 view_btn.pack(side="right", padx=20)
         else:
             ctk.CTkLabel(friends_frame, text="It's a bit lonely here. Search for friends below!", font=FONT_MAIN, text_color=TEXT_SUB).pack(anchor="w")

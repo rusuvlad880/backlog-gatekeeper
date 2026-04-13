@@ -185,7 +185,7 @@ def get_friends_list():
             else:
                 other_id = relation['user_id']
                 
-            # 🛡️ THE CHECK: If we already drew this friend, skip to the next one!
+            #THE CHECK: If we already drew this friend, skip to the next one!
             if other_id in seen_ids:
                 continue
                 
@@ -207,6 +207,14 @@ def get_friends_list():
         return friends_list
     except Exception as e:
         print(f"Database Error (Get Friends): {e}")
+        return []
+
+def get_friend_games(friend_id):
+    try:
+        response = supabase.table("games").select("*").eq("user_id", friend_id).execute()
+        return response.data
+    except Exception as e:
+        print(f"Database Error (Friend Games): {e}")
         return []
 
 if __name__ == '__main__':
