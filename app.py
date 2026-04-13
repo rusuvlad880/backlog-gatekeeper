@@ -140,13 +140,65 @@ def load_social_page():
         ctk.CTkButton(setup_frame, text="Claim Username", width=300, height=45, fg_color=ACCENT_COLOR, hover_color=ACCENT_HOVER, font=("Segoe UI", 16, "bold"), command=attempt_claim).pack()
 
     else:
+        # --- THE ACTUAL SOCIAL HUB ---
         my_username = profile['username']
         
         header_frame = ctk.CTkFrame(social_page, fg_color="transparent")
-        header_frame.pack(fill="x", padx=40, pady=40)
+        header_frame.pack(fill="x", padx=40, pady=(40, 20))
         
-        ctk.CTkLabel(header_frame, text=f"Welcome back, {my_username}!", font=("Segoe UI", 32, "bold")).pack(side="left")
+        ctk.CTkLabel(header_frame, text=f"Welcome back, {my_username}!", font=("Segoe UI", 32, "bold"), text_color=TEXT_MAIN).pack(side="left")
+
+        pending_requests = database.get_pending_requests()
         
+        if pending_requests:
+            inbox_frame = ctk.CTkFrame(social_page, fg_color="transparent")
+            inbox_frame.pack(fill="x", padx=40, pady=(0, 20))
+            
+            ctk.CTkLabel(inbox_frame, text="📥 Incoming Friend Requests", font=("Segoe UI", 20, "bold"), text_color=ACCENT_COLOR).pack(anchor="w", pady=(0, 10))
+            
+            for req in pending_requests:
+                req_row = ctk.CTkFrame(inbox_frame, fg_color=CARD_COLOR, corner_radius=8)
+                req_row.pack(fill="x", pady=5)
+                
+                ctk.CTkLabel(req_row, text=f"{req['username']} wants to be friends!", font=FONT_MAIN, text_color=TEXT_MAIN).pack(side="left", padx=20, pady=15)
+                
+                def accept_cmd(rid=req['request_id']):
+                    if database.accept_friend_request(rid):
+                        print(f"Accepted {req['username']}!")
+                        load_social_page() # Instantly reload the page to hide the accepted request!
+                
+                # A slick green button for accepting!
+                acc_btn = ctk.CTkButton(req_row, text="Accept", width=80, fg_color="#10B981", hover_color="#059669", command=accept_cmd)
+                acc_btn.pack(side="right", padx=20)
+
+        # ==========================================
+        #          MY FRIENDS LIST
+        # ==========================================
+        my_friends = database.get_friends_list()
+        
+        friends_frame = ctk.CTkFrame(social_page, fg_color="transparent")
+        friends_frame.pack(fill="x", padx=40, pady=(0, 20))
+        
+        ctk.CTkLabel(friends_frame, text="👥 My Friends", font=("Segoe UI", 20, "bold"), text_color=TEXT_MAIN).pack(anchor="w", pady=(0, 10))
+        
+        if my_friends:
+            for f in my_friends:
+                f_card = ctk.CTkFrame(friends_frame, fg_color=CARD_COLOR, corner_radius=8, height=60)
+                f_card.pack(fill="x", pady=5)
+                
+                ctk.CTkLabel(f_card, text=f['username'], font=FONT_MAIN, text_color=TEXT_MAIN).pack(side="left", padx=20, pady=15)
+                
+                # A placeholder button for our next epic feature!
+                view_btn = ctk.CTkButton(f_card, text="View Shelf", width=100, fg_color=INPUT_COLOR, hover_color=SIDEBAR_COLOR)
+                view_btn.pack(side="right", padx=20)
+        else:
+            ctk.CTkLabel(friends_frame, text="It's a bit lonely here. Search for friends below!", font=FONT_MAIN, text_color=TEXT_SUB).pack(anchor="w")
+
+        # ==========================================
+        #          FRIEND SEARCH ENGINE
+        # ==========================================
+
+
         search_frame = ctk.CTkFrame(social_page, fg_color="transparent")
         search_frame.pack(fill="x", padx=40, pady=(0, 20))
         
@@ -223,6 +275,15 @@ nav_btn_soc.pack(pady=10, padx=10, fill="x")
 
 nav_btn_set = ctk.CTkButton(global_sidebar, text="⚙️ Settings", font=FONT_MAIN, fg_color="transparent", text_color=TEXT_MAIN, hover_color=SIDEBAR_COLOR, anchor="w", command=lambda: switch_page("Settings"))
 nav_btn_set.pack(pady=10, padx=10, fill="x")
+
+def perform_logout():
+    # Tell the cloud we are leaving, hide the dashboard, and show the login screen!
+    database.supabase.auth.sign_out()
+    dashboard_screen.pack_forget()
+    login_screen.pack(fill="both", expand=True)
+
+logout_btn = ctk.CTkButton(global_sidebar, text="🚪 Log Out", font=FONT_MAIN, fg_color="transparent", text_color=TEXT_SUB, hover_color="#E11D48", anchor="w", command=perform_logout)
+logout_btn.pack(side="bottom", pady=20, padx=10, fill="x")
 
 # Library default
 library_page.pack(fill="both", expand=True)

@@ -114,6 +114,100 @@ def send_friend_request(friend_id):
     except Exception as e:
         print(f"Database Error (Send Request): {e}")
         return False
+    
+def search_users(search_query):
+    try:
+        response = supabase.table("profiles").select("*").ilike("username", f"%{search_query}%").execute()
+        user = supabase.auth.get_user().user
+        results = [p for p in response.data if p['user_id'] != user.id]
+        return results
+    except Exception as e:
+        print(f"Database Error (Search Users): {e}")
+        return []
+    
+def send_friend_request(friend_id):
+    try:
+        user = supabase.auth.get_user().user
+        # Write the request into the ledger!
+        data = {"user_id": user.id, "friend_id": friend_id, "status": "pending"}
+        supabase.table("friends").insert(data).execute()
+        return True
+    except Exception as e:
+        print(f"Database Error (Send Request): {e}")
+        return False
+
+def get_pending_requests():
+    try:
+        user = supabase.auth.get_user().user
+        if not user: return []
+
+        # 1. Ask the ledger for all pending requests sent TO me
+        response = supabase.table("friends").select("*").eq("friend_id", user.id).eq("status", "pending").execute()
+        
+        # 2. Match those requests with the person's Username!
+        inbox = []
+        for req in response.data:
+            prof = supabase.table("profiles").select("username").eq("user_id", req['user_id']).execute()
+            username = prof.data[0]['username'] if prof.data else "Unknown Player"
+            inbox.append({
+                "request_id": req['id'],
+                "username": username
+            })
+        return inbox
+    except Exception as e:
+        print(f"Database Error (Get Requests): {e}")
+        return []
+
+def accept_friend_request(request_id):
+    try:
+        # Flip the status from 'pending' to 'accepted' in the vault!
+        supabase.table("friends").update({"status": "accepted"}).eq("id", request_id).execute()
+        return True
+    except Exception as e:
+        print(f"Database Error (Accept Request): {e}")
+        return False
+
+def get_friends_list():
+    try:
+        user = supabase.auth.get_user().user
+        if not user: return []
+
+        # 1. Ask the ledger for all 'accepted' friendships
+        response = supabase.table("friends").select("*").eq("status", "accepted").execute()
+        
+        friends_list = []
+        seen_ids = set() # <--- THE MAGIC SHIELD: Remembers who we already added
+        
+        for relation in response.data:
+            # Figure out which ID is the friend
+            if str(relation['user_id']) == str(user.id):
+                other_id = relation['friend_id'] 
+            else:
+                other_id = relation['user_id']
+                
+            # 🛡️ THE CHECK: If we already drew this friend, skip to the next one!
+            if other_id in seen_ids:
+                continue
+                
+            seen_ids.add(other_id) # Mark this friend as "seen"
+            
+            # Grab their Username
+            prof = supabase.table("profiles").select("username").eq("user_id", other_id).execute()
+            
+            if prof.data:
+                username = prof.data[0]['username']
+            else:
+                username = "Unknown Player"
+            
+            friends_list.append({
+                "friend_id": other_id,
+                "username": username
+            })
+            
+        return friends_list
+    except Exception as e:
+        print(f"Database Error (Get Friends): {e}")
+        return []
 
 if __name__ == '__main__':
     print("Cloud database script ready!")
