@@ -202,15 +202,40 @@ def load_social_page():
             
             row_idx, col_idx = 0, 0
             for game in their_games:
-                g_card = ctk.CTkFrame(grid_frame, fg_color=CARD_COLOR, width=200, height=100, corner_radius=10)
+                g_card = ctk.CTkFrame(grid_frame, fg_color=CARD_COLOR, width=220, height=200, corner_radius=10)
                 g_card.grid_propagate(False)
-                g_card.grid(row=row_idx, column=col_idx, padx=10, pady=10)
+                g_card.grid(row=row_idx, column=col_idx, padx=15, pady=15)
                 
-                ctk.CTkLabel(g_card, text=game['title'], font=("Segoe UI", 14, "bold"), text_color=TEXT_MAIN, wraplength=180).pack(pady=(15, 5))
+                # 2. Fetch and draw the Steam image!
+                if game.get('image_url'):
+                    try:
+                        import urllib.request
+                        from PIL import Image
+                        import io
+                        
+                        # Request the image from the web
+                        req = urllib.request.Request(game['image_url'], headers={'User-Agent': 'Mozilla/5.0'})
+                        raw_data = urllib.request.urlopen(req).read()
+                        img_data = Image.open(io.BytesIO(raw_data))
+                        
+                        # Convert it into a CustomTkinter image
+                        cover_image = ctk.CTkImage(light_image=img_data, dark_image=img_data, size=(180, 85))
+                        img_label = ctk.CTkLabel(g_card, image=cover_image, text="")
+                        img_label.pack(pady=(15, 0))
+                    except Exception as e:
+                        print(f"Error loading image for {game['title']}: {e}")
+                        # Fallback if image fails to load
+                        ctk.CTkLabel(g_card, text="🖼️ No Image", font=FONT_MAIN, text_color=TEXT_SUB).pack(pady=(15, 0))
+                else:
+                    ctk.CTkLabel(g_card, text="🖼️ No Image", font=FONT_MAIN, text_color=TEXT_SUB).pack(pady=(15, 0))
+                        
+                # 3. Draw the Title and Status below the image
+                ctk.CTkLabel(g_card, text=game['title'], font=("Segoe UI", 14, "bold"), text_color=TEXT_MAIN, wraplength=180).pack(pady=(10, 5))
                 
                 status_color = PLAY_COLOR if game['status'] == "Playing" else TEXT_SUB
                 ctk.CTkLabel(g_card, text=game['status'], font=("Segoe UI", 12), text_color=status_color).pack()
                 
+                # 4. Grid math (3 columns)
                 col_idx += 1
                 if col_idx > 2: 
                     col_idx = 0
@@ -334,43 +359,68 @@ sidebar_title.pack(pady=(30, 10))
 steam_search_entry = ctk.CTkEntry(sidebar, placeholder_text="Search Steam...", width=200, fg_color=INPUT_COLOR, border_width=0)
 steam_search_entry.pack(pady=5)
 
-def perform_steam_search():
-    global current_image_url
+steam_cache = {}
 
-    search_term = steam_search_entry.get()
+def perform_steam_search():
+    search_term = steam_search_entry.get().strip()
     if not search_term:
-        print("Please type a new game to search!")
+        steam_dropdown.set("Type a game first!")
         return
     
+    steam_dropdown.set("Searching...") # Give the user visual feedback!
+    
     try:
+        import requests
         url = f"https://store.steampowered.com/api/storesearch/?term={search_term}&l=english&cc=US"
-        response = requests.get(url)
-        data = response.json()
+        data = requests.get(url).json()
 
         if data.get('items'):
-
-            top_game = data['items'][0]
+            steam_cache.clear() # Clear the old search memory
+            game_names = []
             
-            title_entry.delete(0, ctk.END)
-            title_entry.insert(0, top_game.get('name', 'Unknown'))
-            
-            platform_entry.delete(0, ctk.END)
-            platform_entry.insert(0, "PC (Steam)")
-
-            current_image_url = top_game.get('tiny_image', "")
-            
-            print(f"Grabbed Image URL: {current_image_url}")
-
-            steam_search_entry.delete(0, ctk.END)
-            print(f"Magic Auto-Fill Success: {top_game}")
+            for item in data['items']:
+                name = item['name']
+                # Save the image URL to our memory bank
+                steam_cache[name] = item.get('tiny_image', '') 
+                game_names.append(name)
+                
+            # Boom! We update the dropdown list with the new games!
+            steam_dropdown.configure(values=game_names)
+            steam_dropdown.set("Select your game...")
         else:
-            print("No games found on Steam.")
+            steam_dropdown.set("No games found.")
+            steam_dropdown.configure(values=["No games found."])
             
     except Exception as e:
         print(f"Steam API Error: {e}")
 
-steam_btn = ctk.CTkButton(sidebar, text="Auto-Fill from Steam", command=perform_steam_search, width=200, fg_color=INPUT_COLOR, border_color=ACCENT_COLOR)
-steam_btn.pack(pady=(0, 20))
+def select_steam_game(choice):
+    global current_image_url
+    
+    # If they actually clicked a game (and not a "Searching..." message)
+    if choice in steam_cache:
+        current_image_url = steam_cache[choice] # Grab the image from memory
+        
+        # Auto-fill the boxes!
+        title_entry.delete(0, ctk.END)
+        title_entry.insert(0, choice)
+        
+        platform_entry.delete(0, ctk.END)
+        platform_entry.insert(0, "PC (Steam)")
+        
+        # Clean up the UI
+        steam_search_entry.delete(0, ctk.END)
+        steam_dropdown.set("Search Results...") 
+        steam_dropdown.configure(values=["Search Results..."])
+
+# The Search Button
+steam_btn = ctk.CTkButton(sidebar, text="Search Steam", command=perform_steam_search, width=200, fg_color=INPUT_COLOR, hover_color=SIDEBAR_COLOR, border_color=ACCENT_COLOR, border_width=1)
+steam_btn.pack(pady=5)
+
+# THE NEW DYNAMIC DROPDOWN MENU!
+steam_dropdown = ctk.CTkOptionMenu(sidebar, values=["Search Results..."], width=200, command=select_steam_game, 
+                                   fg_color=INPUT_COLOR, button_color=ACCENT_COLOR, button_hover_color=ACCENT_HOVER, dropdown_fg_color=SIDEBAR_COLOR)
+steam_dropdown.pack(pady=(0, 20))
 
 title_entry = ctk.CTkEntry(sidebar, placeholder_text="Game Title", width=200, fg_color=INPUT_COLOR, border_width=0)
 title_entry.pack(pady=10)
@@ -386,21 +436,35 @@ status_dropdown.set("Backlog")
 def save_button_clicked():
     global current_image_url
     
-    title = title_entry.get()
-    platform = platform_entry.get()
+    title = title_entry.get().strip()
+    platform = platform_entry.get().strip()
     status = status_dropdown.get()
-    
+
     if title and platform and status:
         try:
-            database.add_game(title, platform, status, current_image_url)
-            
-            print(f"Success! Saved {title} to the cloud with its image.")
+            # --- THE SILENT IMAGE FETCHER ---
+            final_image_url = current_image_url
+            if not final_image_url:
+                # They typed it manually! Let's try to grab an image silently in the background.
+                try:
+                    import requests
+                    url = f"https://store.steampowered.com/api/storesearch/?term={title}&l=english&cc=US"
+                    res = requests.get(url).json()
+                    if res.get('items'):
+                        final_image_url = res['items'][0].get('tiny_image', "")
+                except:
+                    pass # If Steam fails, we just save it without an image.
+
+            database.add_game(title, platform, status, final_image_url)
+            print(f"Success! Saved {title} to the cloud.")
             
             title_entry.delete(0, ctk.END)
             platform_entry.delete(0, ctk.END)
             status_dropdown.set("Backlog")
-            
             current_image_url = "" 
+            
+            load_games() 
+            
         except Exception as e:
             print(f"DATABASE ERROR: {e}") 
     else:
